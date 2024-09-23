@@ -275,6 +275,9 @@ Func get_price($item_name)
 EndFunc
 
 Func Quit()
+    if (Not FileExists($fileheader)) Then
+        _WinAPI_CreateDirectory($fileheader)
+    EndIf
 	$defs = FileOpen($fileheader & "/def.txt", $FO_OVERWRITE )
 	$temp=WinGetPos($guu)
 	$y=$temp[1]
