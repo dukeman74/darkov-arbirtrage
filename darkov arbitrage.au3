@@ -93,7 +93,7 @@ Func get_cleaned_pic($hbitmap)
             $iRGBA = DllStructGetData($tPixel, 1, $iRowOffset + $iX)
             $aHSL = RGB2HSL($iRGBA) ;convert color to HSL color space
             ;check if HSL color is in the red / purple range -> see http://hslpicker.com for details
-            If ($aHSL[1]>.10) Then
+            If ($aHSL[1]>.1) Then
                 DllStructSetData($tPixel, 1, 0xFF000000, $iRowOffset + $iX) ;if yes then set black pixel
             Else
                 DllStructSetData($tPixel, 1, 0xFFFFFFFF, $iRowOffset + $iX) ;else black pixel 
@@ -106,6 +106,7 @@ Func get_cleaned_pic($hbitmap)
     $canvas = _GDIPlus_ImageLoadFromFile("blank_canvas.bmp")
     $hGraphics = _GDIPlus_ImageGetGraphicsContext($canvas)
     _GDIPlus_GraphicsDrawImageRect($hGraphics, $hbitmap, 10, 10,76,20)
+    _GDIPlus_GraphicsDispose($hGraphics)
     return $canvas
 
 
@@ -302,6 +303,12 @@ Func price_check()
     ;ConsoleWrite(Int($word) &  @CRLF)
     if $word <> "" then
         Return(Int($word))
+    EndIf
+    if $word == "m" then
+        Return(1000000)
+    EndIf
+    if $word == "rr" then
+        Return(1000000)
     EndIf
     ConsoleWrite("Illegible: "& $word &  @CRLF)
     
