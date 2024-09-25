@@ -15,11 +15,14 @@
 #include <WinAPIHObj.au3>
 
 HotKeySet("^!q", "Quit")
-
+$strat = 0
 Func read($scale)
    $array=readBox()
    return(getText($array[0],$array[1],$array[2],$array[3],$scale))
 EndFunc
+
+Global $all_data
+Global $cost_of_top=100000
 
 func readBox()
    $flag=1
@@ -111,6 +114,149 @@ Func get_cleaned_pic($hbitmap)
 
 
 EndFunc
+ 
+func send_sniffer()
+    RunWait('snif.bat', NULL,NULL,@SW_HIDE)
+EndFunc
+
+func catch_packets()
+    $cost_of_top=100000
+    ;ConsoleWrite("e" & @CRLF)
+    send_sniffer()
+    ;RunWait('\"Program Files\Wireshark\tshark.exe"', '-i ethernet -f \"src host 35.71.175.214\" -w packets -c 200', NULL,NULL)
+    $packets = fileopen("packets", $FO_BINARY)
+    Local $b
+    $already_matched = false
+    $matching = 0
+    $match_str = "DesignDataItem:"
+    $match_len = StringLen($match_str)
+    $item_name = ""
+    $end = Binary("0x18")
+    ;ConsoleWrite((StringMid($match_str,1,1)))
+    ;ConsoleWrite(@CRLF)
+    $add=true
+    Global $des[12]
+    Global $namedsd[12]
+    $prop=0
+    $building=""
+    $databuild = ""
+    $gotname = false
+    $stop=false
+    $juststop=0
+    Global $costbytes[2]
+    For $i = 0 To 2000 Step +1
+        $b = FileRead($packets,1)
+        ;if $gotname Then
+            ;if $b >= 0x30 And $b < 0x7b then
+            ;    ConsoleWrite(BinaryToString($b))
+            ;Else
+            ;    ;ConsoleWrite(StringRight(StringToBinary($b),2) & " ")
+            ;    ConsoleWrite(" " & $b & " ")
+            ;EndIf
+        ;EndIf
+        if(not $already_matched) then
+            if($juststop<2 AND $stop) Then
+                $des[$prop] = "cost"
+                ;$namedsd[$prop] = int($b)
+                $costbytes[$juststop]=$b
+                $juststop+=1
+                If ($juststop==2) Then
+                    if int($costbytes[1]) == 0x20 Then
+                        $namedsd[$prop] = int($costbytes[0])
+                    Else
+                        $namedsd[$prop] = int($costbytes[0]) + 128 * (int($costbytes[1])-1)
+                    EndIf
+                EndIf
+            ENDIF   
+            if $b == StringToBinary(StringMid($match_str,1+$matching,1)) Then
+                $matching+=1
+                if ($matching >= $match_len) Then
+                    ;ConsoleWrite(" MATCHED! ")
+                    $add=true
+                    $already_matched = true
+                    If ($gotname) Then
+                        $namedsd[$prop-1]=$databuild
+                        $databuild=" " & ($end) & " "
+                    EndIf
+                    $gotname=true
+                EndIf
+            Else
+                $matching = 0
+                if $gotname Then
+                    if ($b == Binary("0x18")) Then
+                        $namedsd[$prop-1]=$databuild
+                        if $stop then ExitLoop
+                        $stop = true
+                        ;ConsoleWrite(" -- DONE -- ")
+                    EndIf
+                    $databuild &= " " & ($b) & " "
+                    
+                EndIf
+            EndIf
+
+        ElseIf(not $stop) Then
+            if($b == $end) Then
+                $add = false
+                if $prop==0 Then
+                    $des[$prop] =  $building
+                Else
+                    $des[$prop] =  StringMid($building,28)
+                EndIf
+                
+                $prop+=1
+                $building = ""
+                $matching = 0
+                $already_matched=false
+                $match_str = "DataItemPropertyType:"
+                $match_len = StringLen($match_str)
+                $end = Binary("0x10")
+            EndIf
+            if($add) Then
+                $building&=BinaryToString($b)
+            EndIf
+        EndIf
+
+    Next
+    ;ConsoleWrite(@CRLF)
+    ;For $e=0 to $prop
+    ;    ConsoleWrite($des[$e] & ": " & $namedsd[$e] & @CRLF)
+    ;Next
+
+    $namedsd[0]=StringMid($des[0],9)
+    $des[0] = "Item name"
+    
+    $rarity = StringRight($namedsd[0],4)
+    $namedsd[0] = StringLeft($namedsd[0],StringLen($namedsd[0])-5)
+    $rarity = StringLeft($rarity,1)
+    Switch $rarity
+        Case "1"
+            $rarity = "Gray"
+        Case "2"
+            $rarity = "White"
+        Case "3"
+            $rarity = "Green"
+        Case "4"
+            $rarity = "Blue"
+        Case "5"
+            $rarity = "Purple"
+        Case "6"
+            $rarity = "Legi"
+        Case "7"
+            $rarity = "Unique"
+    EndSwitch
+    $to_data = $des[0] & ": " & $rarity & " " & $namedsd[0] & @CRLF
+    For $e=1 to $prop-1
+        $to_data &= $des[$e] & ": " & Int(StringMid($namedsd[$e],8,4)) & @CRLF
+    Next
+    $to_data &= $des[$prop] & ": " & $namedsd[$prop] & @CRLF
+    if $namedsd[$prop] <> "" Then
+        $cost_of_top=Int($namedsd[$prop])
+    EndIf
+    GUICtrlSetData($all_data,$to_data)
+    ;ConsoleWrite(@CRLF & "Item name: " & $item_name)
+    ;ConsoleWrite($packetsstr)
+	FileClose($packets)
+EndFunc
 
 
 Func getText($xs,$ys,$xe,$ye,$s)
@@ -155,14 +301,16 @@ Global $states[200][5][$pictureroot * $pictureroot]
 $states[0][$NAME][0] = "No idea"
 
 Do
+    
     _GDIPlus_Startup()
     $fileheader = "data"
     $defs = FileOpen($fileheader & "/def.txt", $FO_READ)
     $x=int(FileReadLine($defs))
     $y=int(FileReadLine($defs))
     $high_num=int(FileReadLine($defs))
+    $strat = int(FileReadLine($defs))
     FileClose($defs)
-	$guu = GUICreate("XP time", 230, 200,$x, $y)
+	$guu = GUICreate("XP time", 230, 350,$x, $y)
     Opt("GUICloseOnESC",0)
     WinSetOnTop($guu,"",$WINDOWS_ONTOP)
     GUISetState(@sw_show, $guu)
@@ -174,7 +322,12 @@ Do
     $readmeme = GUICtrlCreateLabel("", 130, 140, 200, 26)
     $scaledmeme = GUICtrlCreateInput("1", 10, 90,20,20)
     $go_button = GUICtrlCreateButton("engage", 120, 160)
+    $sniff = GUICtrlCreateButton("sniff", 170, 160)
     $picture = GUICtrlCreateButton("",70,70,120,50,$BS_BITMAP)
+    $all_data = GUICtrlCreateLabel("", 10, 220, 200, 240)
+    $kind = GUICtrlCreateButton("switch strat", 10, 190)
+    $active_kind = GUICtrlCreateLabel("OCR", 80, 195, 97)
+    If $strat Then GUICtrlSetData($active_kind,"Packets")
     $going = False
     ;GUICtrlSetColor($go_button, 0x8CD248)
     If True Then ;read in states from files
@@ -223,6 +376,11 @@ EndIf
             price_check()
       ElseIf $in = $buy Then
         buy_cheapest()
+      ElseIf $in = $sniff Then
+        ;send_sniffer()
+        ;Sleep(100)
+        refresh_prices(false)
+        catch_packets()
       ElseIf $in = $go_button Then
         $going= Not $going
         if($going) Then
@@ -231,14 +389,32 @@ EndIf
         Else
             GUICtrlSetColor($go_button, 0x0)
         EndIf
+      ElseIf $in = $kind Then
+        If $strat Then 
+            $strat=0
+            GUICtrlSetData($active_kind,"OCR")
+        Else
+            $strat=1
+            GUICtrlSetData($active_kind,"Packets")
+            
+        EndIf
       EndIf
       if($going) Then
-        $cost = price_check()
-        if $cost < Int(GUICtrlRead($high)) Then
-            buy_cheapest()
-            ConsoleWrite("buying a pair for " & $cost & @CRLF)
+        if $strat Then
+            refresh_prices(false)
+            catch_packets()
+            if $cost_of_top < Int(GUICtrlRead($high)) Then
+                buy_cheapest()
+                ConsoleWrite("buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
+            EndIf
+        Else
+            $cost = price_check()
+            if $cost < Int(GUICtrlRead($high)) Then
+                buy_cheapest()
+                ConsoleWrite("buying item for " & $cost & @CRLF)
+            EndIf
+            refresh_prices()
         EndIf
-        refresh_prices()
       EndIf
 	WEnd
 Until true
@@ -247,20 +423,22 @@ Func check_menu_adherance($menu_to_check)
 
 EndFunc
 
-Func refresh_prices()
+Func refresh_prices($sleep=true)
     MouseClick("Primary",1790, 278,1,0)
-    Sleep(400)
+    if($sleep) Then
+        Sleep(400)
+    EndIf
 EndFunc
 
 Func buy_cheapest()
     MouseClick("Primary",1794, 360,1,0)
-    Sleep(40)
-    MouseClick("Primary",951, 765,1,0)
-    Sleep(40)
-    MouseClick("Primary",957, 848,1,0)
     Sleep(200)
+    MouseClick("Primary",951, 765,1,0)
+    Sleep(200)
+    MouseClick("Primary",957, 848,1,0)
+    Sleep(800)
     MouseClick("Primary",959, 621,1,0)
-    sleep(200)
+    sleep(300)
     $basd = PixelGetColor(843, 875)
     if($basd == 0x474330) Then
         ConsoleWrite("aids" & @CRLF)
@@ -289,6 +467,7 @@ Func Quit()
 	FileWriteLine($defs,$x)
 	FileWriteLine($defs,$y)
 	FileWriteLine($defs,GUICtrlRead($high))
+    FileWriteLine($defs,$strat)
 	FileClose($defs)
 	Exit
 EndFunc
@@ -307,10 +486,10 @@ Func price_check()
     if $word <> "" then
         Return(Int($word))
     EndIf
-    if $word == "m" then
+    if $word == "m\n" then
         Return(1000000)
     EndIf
-    if $word == "rr" then
+    if $word == "rr\n" then
         Return(1000000)
     EndIf
     ConsoleWrite("Illegible: "& $word &  @CRLF)
