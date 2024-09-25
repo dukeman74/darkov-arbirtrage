@@ -1,4 +1,5 @@
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_Icon=data\icon.ico
 #AutoIt3Wrapper_UseX64=y
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #include <Constants.au3>
@@ -23,6 +24,9 @@ EndFunc
 
 Global $all_data
 Global $cost_of_top=100000
+Global $this_item_rarity
+Global $rarity_buys[8]
+Global $total_spent = 0
 
 func readBox()
    $flag=1
@@ -106,7 +110,7 @@ Func get_cleaned_pic($hbitmap)
     _GDIPlus_BitmapUnlockBits($hBitmap, $tBitmapData) ;unlocks a portion of a bitmap that was locked by _GDIPlus_BitmapLockBits
 
     ;crop part
-    $canvas = _GDIPlus_ImageLoadFromFile("blank_canvas.bmp")
+    $canvas = _GDIPlus_ImageLoadFromFile("data/blank_canvas.bmp")
     $hGraphics = _GDIPlus_ImageGetGraphicsContext($canvas)
     _GDIPlus_GraphicsDrawImageRect($hGraphics, $hbitmap, 10, 10,76,20)
     _GDIPlus_GraphicsDispose($hGraphics)
@@ -116,7 +120,8 @@ Func get_cleaned_pic($hbitmap)
 EndFunc
  
 func send_sniffer()
-    RunWait('snif.bat', NULL,NULL,@SW_HIDE)
+    RunWait('data\snif.bat', NULL,NULL,@SW_HIDE)
+    ;Sleep(200)
 EndFunc
 
 func catch_packets()
@@ -124,7 +129,7 @@ func catch_packets()
     ;ConsoleWrite("e" & @CRLF)
     send_sniffer()
     ;RunWait('\"Program Files\Wireshark\tshark.exe"', '-i ethernet -f \"src host 35.71.175.214\" -w packets -c 200', NULL,NULL)
-    $packets = fileopen("packets", $FO_BINARY)
+    $packets = fileopen("data\packets", $FO_BINARY)
     Local $b
     $already_matched = false
     $matching = 0
@@ -147,12 +152,12 @@ func catch_packets()
     For $i = 0 To 2000 Step +1
         $b = FileRead($packets,1)
         ;if $gotname Then
-            ;if $b >= 0x30 And $b < 0x7b then
-            ;    ConsoleWrite(BinaryToString($b))
-            ;Else
-            ;    ;ConsoleWrite(StringRight(StringToBinary($b),2) & " ")
-            ;    ConsoleWrite(" " & $b & " ")
-            ;EndIf
+        ;    if $b >= 0x30 And $b < 0x7b then
+        ;        ConsoleWrite(BinaryToString($b))
+        ;    Else
+        ;        ;ConsoleWrite(StringRight(StringToBinary($b),2) & " ")
+        ;        ConsoleWrite(" " & $b & " ")
+        ;    EndIf
         ;EndIf
         if(not $already_matched) then
             if($juststop<2 AND $stop) Then
@@ -228,6 +233,7 @@ func catch_packets()
     $rarity = StringRight($namedsd[0],4)
     $namedsd[0] = StringLeft($namedsd[0],StringLen($namedsd[0])-5)
     $rarity = StringLeft($rarity,1)
+    $this_item_rarity=Int($rarity)-1
     Switch $rarity
         Case "1"
             $rarity = "Gray"
@@ -262,21 +268,21 @@ EndFunc
 Func getText($xs,$ys,$xe,$ye,$s)
     $bruh = _ScreenCapture_Capture("", $xs, $ys, $xe, $ye)
     $hbitmap = _GDIPlus_BitmapCreateFromHBITMAP($bruh)
-    $fname = "output.bmp"
+    $fname = "data/output.bmp"
 	;_ScreenCapture_SaveImage("GSI.jpg",$bruh)
     $goodmap=get_cleaned_pic($hbitmap)
     
     
     ;_ScreenCapture_SaveImage ($fname, $bruh)
-    _GDIPlus_ImageSaveToFile( $hbitmap, "start.bmp")
+    _GDIPlus_ImageSaveToFile( $hbitmap, "data/start.bmp")
     _GDIPlus_ImageSaveToFile( $goodmap, $fname)
     _GDIPlus_BitmapDispose($hbitmap)
     _GDIPlus_BitmapDispose($goodmap)
     ;while(FileExists ( $fname ) == 0)
     ;    Sleep(10)
     ;WEnd
-    ShellExecuteWait('\Program Files\Tesseract-OCR\tesseract', $fname & " ex --psm 7", NULL,NULL,@SW_HIDE)
-	$number = fileopen("ex.txt")
+    ShellExecuteWait('\Program Files\Tesseract-OCR\tesseract', $fname & " data/ex --psm 7", NULL,NULL,@SW_HIDE)
+	$number = fileopen("data/ex.txt")
     $numberstr = FileReadLine($number)
 	_WinAPI_DeleteObject($bruh)
 	FileClose($number)
@@ -305,6 +311,10 @@ Do
     _GDIPlus_Startup()
     $fileheader = "data"
     $defs = FileOpen($fileheader & "/def.txt", $FO_READ)
+    $summary = FileOpen("summary.txt", $FO_OVERWRITE)
+    For $i = 0 To UBound($rarity_buys)-1
+        $rarity_buys[$i] = 0
+     Next
     $x=int(FileReadLine($defs))
     $y=int(FileReadLine($defs))
     $high_num=int(FileReadLine($defs))
@@ -320,7 +330,6 @@ Do
     $readameme = GUICtrlCreateButton("read anywhere", 10, 130)
     $res = GUICtrlCreateButton("read cheapest price", 10, 160)
     $readmeme = GUICtrlCreateLabel("", 130, 140, 200, 26)
-    $scaledmeme = GUICtrlCreateInput("1", 10, 90,20,20)
     $go_button = GUICtrlCreateButton("engage", 120, 160)
     $sniff = GUICtrlCreateButton("sniff", 170, 160)
     $picture = GUICtrlCreateButton("",70,70,120,50,$BS_BITMAP)
@@ -370,7 +379,7 @@ EndIf
 	  if($in = $GUI_EVENT_CLOSE) Then
 		 Quit()
 	  ElseIf $in = $readameme Then
-		 $word=read(GUICtrlRead($scaledmeme))
+		 $word=read(1)
 		 GUICtrlSetData($readmeme,$word)
       ElseIf $in = $res Then
             price_check()
@@ -406,6 +415,9 @@ EndIf
             if $cost_of_top < Int(GUICtrlRead($high)) Then
                 buy_cheapest()
                 ConsoleWrite("buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
+                FileWrite($summary,"buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
+                $rarity_buys[$this_item_rarity]+=1
+                $total_spent+=$cost_of_top
             EndIf
         Else
             $cost = price_check()
@@ -452,10 +464,50 @@ Func get_price($item_name)
     
 EndFunc
 
+
+Func FilePrepend($szFile,$szText)
+
+    If Not FileExists($szFile) Then Return
+
+    $szBuffer = FileRead($szFile,FileGetSize($szFile))
+
+    $szBuffer = $szText & $szBuffer
+
+    FileDelete($szFile)
+
+    Return FileWrite($szFile,$szBuffer)
+
+EndFunc
+
 Func Quit()
     if (Not FileExists($fileheader)) Then
         _WinAPI_CreateDirectory($fileheader)
     EndIf
+    FileClose($summary)
+    $out = "Total spend: " & $total_spent & @CRLF
+    For $i = 0 To 7 Step +1
+        if $rarity_buys[$i] <> 0 Then
+            Switch $i
+                Case 0
+                    $out&= "Gray"
+                Case 1
+                    $out&= "White"
+                Case 2
+                    $out&= "Green"
+                Case 3
+                    $out&= "Blue"
+                Case 4
+                    $out&= "Purple"
+                Case 5
+                    $out&= "Legi"
+                Case 6
+                    $out&= "Unique"
+            EndSwitch
+            $out&= "s: " & $rarity_buys[$i] & "  " & @CRLF
+        EndIf
+    Next
+    $out&= @CRLF
+    FilePrepend("summary.txt", $out & @CRLF)
 	$defs = FileOpen($fileheader & "/def.txt", $FO_OVERWRITE )
 	$temp=WinGetPos($guu)
 	$y=$temp[1]
@@ -473,7 +525,7 @@ Func Quit()
 EndFunc
 
 Func price_check()
-    $word = getText(1488, 348, 1563, 367, GUICtrlRead($scaledmeme))
+    $word = getText(1488, 348, 1563, 367, 1)
     ;ConsoleWrite($word & @CRLF)
     $word = StringRegExpReplace($word, '\D', '')
     GUICtrlSetData($readmeme,$word)

@@ -1,5 +1,6 @@
-/ex.txt
-/output.bmp
-/start.bmp
 /starting*
-/data/def.txt
+/summary.txt
+/data/*
+!/data/blank_canvas.bmp
+!/data/snif.bat
+!/data/icon.ico
