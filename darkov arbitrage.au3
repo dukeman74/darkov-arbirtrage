@@ -148,6 +148,8 @@ func catch_packets()
     $gotname = false
     $stop=false
     $juststop=0
+    $protect=0
+    $read_a_property=false
     Global $costbytes[2]
     For $i = 0 To 2000 Step +1
         $b = FileRead($packets,1)
@@ -183,17 +185,24 @@ func catch_packets()
                         $namedsd[$prop-1]=$databuild
                         $databuild=" " & ($end) & " "
                     EndIf
+                    if $gotname Then $read_a_property=True
                     $gotname=true
+                    $protect=2
                 EndIf
             Else
                 $matching = 0
                 if $gotname Then
-                    if ($b == Binary("0x18")) Then
-                        $namedsd[$prop-1]=$databuild
-                        if $stop then ExitLoop
-                        $stop = true
-                        ;ConsoleWrite(" -- DONE -- ")
+                    If ($read_a_property and $protect == 0 ) Then
+                        if ( $b == Binary("0x18")) Then
+                            $namedsd[$prop-1]=$databuild
+                            if $stop then ExitLoop
+                            $stop = true
+                            ;ConsoleWrite(" -- DONE -- ")
+                        EndIf
+                    Else
+                        $protect-=1
                     EndIf
+                    
                     $databuild &= " " & ($b) & " "
                     
                 EndIf
@@ -310,16 +319,24 @@ Do
     
     _GDIPlus_Startup()
     $fileheader = "data"
-    $defs = FileOpen($fileheader & "/def.txt", $FO_READ)
+    
     $summary = FileOpen("summary.txt", $FO_OVERWRITE)
     For $i = 0 To UBound($rarity_buys)-1
         $rarity_buys[$i] = 0
      Next
-    $x=int(FileReadLine($defs))
-    $y=int(FileReadLine($defs))
-    $high_num=int(FileReadLine($defs))
-    $strat = int(FileReadLine($defs))
-    FileClose($defs)
+    if FileExists($fileheader & "/def.txt") Then
+        $defs = FileOpen($fileheader & "/def.txt", $FO_READ)
+        $x=int(FileReadLine($defs))
+        $y=int(FileReadLine($defs))
+        $high_num=int(FileReadLine($defs))
+        $strat = int(FileReadLine($defs))
+        FileClose($defs)
+    Else
+        $x=10
+        $y=10
+        $high_num=50
+        $strat = 0
+    EndIf
 	$guu = GUICreate("XP time", 230, 350,$x, $y)
     Opt("GUICloseOnESC",0)
     WinSetOnTop($guu,"",$WINDOWS_ONTOP)
