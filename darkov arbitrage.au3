@@ -119,6 +119,21 @@ Func get_cleaned_pic($hbitmap)
 
 EndFunc
 
+Func optimal_refresh()
+	$T = TimerInit()
+	$PID = Run('data\snif.bat', NULL,NULL,@SW_HIDE)
+	ConsoleWrite(TimerDiff($T) & " time to launch tshark" & @CRLF)
+	$T = TimerInit()
+	refresh_prices(False)
+	ConsoleWrite(TimerDiff($T) & " time to click refresh" & @CRLF)
+	$T = TimerInit()
+	While ProcessExists($PID)
+		Sleep(1)
+	WEnd
+	ConsoleWrite(TimerDiff($T) & " time for those packets to come in" & @CRLF)
+	catch_packets(True)
+EndFunc
+
 func send_sniffer()
     RunWait('data\snif.bat', NULL,NULL,@SW_HIDE)
     ;Sleep(200)
@@ -265,6 +280,8 @@ func catch_packets($already=False)
             $rarity = "Legi"
         Case "7"
             $rarity = "Unique"
+		Case "8"
+            $rarity = "Artifact"
     EndSwitch
     $to_data = $des[0] & ": " & $rarity & " " & $namedsd[0] & @CRLF
     For $e=1 to $prop-1
@@ -410,11 +427,7 @@ EndIf
       ElseIf $in = $buy Then
         buy_cheapest()
       ElseIf $in = $sniff Then
-        ;send_sniffer()
-        ;Sleep(100)
-
-        refresh_prices(false)
-        catch_packets()
+		optimal_refresh()
       ElseIf $in = $go_button Then
         $going= Not $going
         if($going) Then
@@ -435,9 +448,7 @@ EndIf
       EndIf
       if($going) Then
         if $strat Then
-			send_sniffer_async()
-            refresh_prices(false)
-            catch_packets(true)
+			optimal_refresh()
             if $cost_of_top < Int(GUICtrlRead($high)) Then
                 buy_cheapest()
                 ConsoleWrite("buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
