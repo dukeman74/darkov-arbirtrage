@@ -103,7 +103,7 @@ Func get_cleaned_pic($hbitmap)
             If ($aHSL[1]>.1) Then
                 DllStructSetData($tPixel, 1, 0xFF000000, $iRowOffset + $iX) ;if yes then set black pixel
             Else
-                DllStructSetData($tPixel, 1, 0xFFFFFFFF, $iRowOffset + $iX) ;else black pixel 
+                DllStructSetData($tPixel, 1, 0xFFFFFFFF, $iRowOffset + $iX) ;else black pixel
             EndIf
         Next
     Next
@@ -118,16 +118,23 @@ Func get_cleaned_pic($hbitmap)
 
 
 EndFunc
- 
+
 func send_sniffer()
     RunWait('data\snif.bat', NULL,NULL,@SW_HIDE)
     ;Sleep(200)
 EndFunc
 
-func catch_packets()
+func send_sniffer_async()
+    Run('data\snif.bat', NULL,NULL,@SW_HIDE)
+    Sleep(800)
+EndFunc
+
+func catch_packets($already=False)
     $cost_of_top=100000
     ;ConsoleWrite("e" & @CRLF)
-    send_sniffer()
+    If not $already Then
+		send_sniffer()
+	EndIf
     ;RunWait('\"Program Files\Wireshark\tshark.exe"', '-i ethernet -f \"src host 35.71.175.214\" -w packets -c 200', NULL,NULL)
     $packets = fileopen("data\packets", $FO_BINARY)
     Local $b
@@ -174,7 +181,7 @@ func catch_packets()
                         $namedsd[$prop] = int($costbytes[0]) + 128 * (int($costbytes[1])-1)
                     EndIf
                 EndIf
-            ENDIF   
+            ENDIF
             if $b == StringToBinary(StringMid($match_str,1+$matching,1)) Then
                 $matching+=1
                 if ($matching >= $match_len) Then
@@ -202,9 +209,9 @@ func catch_packets()
                     Else
                         $protect-=1
                     EndIf
-                    
+
                     $databuild &= " " & ($b) & " "
-                    
+
                 EndIf
             EndIf
 
@@ -216,7 +223,7 @@ func catch_packets()
                 Else
                     $des[$prop] =  StringMid($building,28)
                 EndIf
-                
+
                 $prop+=1
                 $building = ""
                 $matching = 0
@@ -238,7 +245,7 @@ func catch_packets()
 
     $namedsd[0]=StringMid($des[0],9)
     $des[0] = "Item name"
-    
+
     $rarity = StringRight($namedsd[0],4)
     $namedsd[0] = StringLeft($namedsd[0],StringLen($namedsd[0])-5)
     $rarity = StringLeft($rarity,1)
@@ -280,8 +287,8 @@ Func getText($xs,$ys,$xe,$ye,$s)
     $fname = "data/output.bmp"
 	;_ScreenCapture_SaveImage("GSI.jpg",$bruh)
     $goodmap=get_cleaned_pic($hbitmap)
-    
-    
+
+
     ;_ScreenCapture_SaveImage ($fname, $bruh)
     _GDIPlus_ImageSaveToFile( $hbitmap, "data/start.bmp")
     _GDIPlus_ImageSaveToFile( $goodmap, $fname)
@@ -301,7 +308,7 @@ Func getText($xs,$ys,$xe,$ye,$s)
     ;    FileDelete ( "ex.txt" )
     ;WEnd
     _GUICtrlButton_SetImage($picture,$fname)
-    
+
     return($numberstr)
   EndFunc   ;getText
 
@@ -316,10 +323,10 @@ Global $states[200][5][$pictureroot * $pictureroot]
 $states[0][$NAME][0] = "No idea"
 
 Do
-    
+
     _GDIPlus_Startup()
     $fileheader = "data"
-    
+
     $summary = FileOpen("summary.txt", $FO_OVERWRITE)
     For $i = 0 To UBound($rarity_buys)-1
         $rarity_buys[$i] = 0
@@ -405,6 +412,7 @@ EndIf
       ElseIf $in = $sniff Then
         ;send_sniffer()
         ;Sleep(100)
+
         refresh_prices(false)
         catch_packets()
       ElseIf $in = $go_button Then
@@ -416,19 +424,20 @@ EndIf
             GUICtrlSetColor($go_button, 0x0)
         EndIf
       ElseIf $in = $kind Then
-        If $strat Then 
+        If $strat Then
             $strat=0
             GUICtrlSetData($active_kind,"OCR")
         Else
             $strat=1
             GUICtrlSetData($active_kind,"Packets")
-            
+
         EndIf
       EndIf
       if($going) Then
         if $strat Then
+			send_sniffer_async()
             refresh_prices(false)
-            catch_packets()
+            catch_packets(true)
             if $cost_of_top < Int(GUICtrlRead($high)) Then
                 buy_cheapest()
                 ConsoleWrite("buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
@@ -468,17 +477,17 @@ Func buy_cheapest()
     Sleep(800)
     MouseClick("Primary",959, 621,1,0)
     sleep(300)
-    $basd = PixelGetColor(843, 875)
-    if($basd == 0x474330) Then
-        ConsoleWrite("aids" & @CRLF)
-        MouseClick("Primary",107, 38,1,0)
-        sleep(200)
-    EndIf
+    ;$basd = PixelGetColor(843, 875)
+    ;if($basd == 0x474330) Then
+    ;    ConsoleWrite("aids" & @CRLF)
+    ;    MouseClick("Primary",107, 38,1,0)
+    ;    sleep(200)
+    ;EndIf
     Sleep(800)
 EndFunc
 
 Func get_price($item_name)
-    
+
 EndFunc
 
 
@@ -562,7 +571,7 @@ Func price_check()
         Return(1000000)
     EndIf
     ConsoleWrite("Illegible: "& $word &  @CRLF)
-    
+
     Return(1000000)
 EndFunc
 
