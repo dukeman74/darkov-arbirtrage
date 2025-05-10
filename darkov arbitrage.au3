@@ -126,9 +126,15 @@ Func optimal_refresh()
 	$T = TimerInit()
 	refresh_prices(False)
 	ConsoleWrite(TimerDiff($T) & " time to click refresh" & @CRLF)
+	$maxwait = 1000
 	$T = TimerInit()
 	While ProcessExists($PID)
 		Sleep(1)
+		if TimerDiff($T) > $maxwait Then
+			ConsoleWrite("must have missed the packets somehow, bailing")
+			ProcessClose($PID)
+			ExitLoop
+		EndIf
 	WEnd
 	ConsoleWrite(TimerDiff($T) & " time for those packets to come in" & @CRLF)
 	catch_packets(True)
@@ -166,6 +172,7 @@ func catch_packets($already=False)
     Global $namedsd[12]
     $prop=0
     $building=""
+	$stk=-1
     $databuild = ""
     $gotname = false
     $stop=false
@@ -175,6 +182,10 @@ func catch_packets($already=False)
     Global $costbytes[2]
     For $i = 0 To 2000 Step +1
         $b = FileRead($packets,1)
+		if $stk == 0 Then
+			$stk=int($b)
+			ConsoleWrite("stack size : " & $stk & @CRLF)
+		EndIf
         ;if $gotname Then
         ;    if $b >= 0x30 And $b < 0x7b then
         ;        ConsoleWrite(BinaryToString($b))
@@ -214,7 +225,8 @@ func catch_packets($already=False)
             Else
                 $matching = 0
                 if $gotname Then
-                    If ($read_a_property and $protect == 0 ) Then
+					;removed requirement for $read_a_property
+                    If  $protect == 0  Then
                         if ( $b == Binary("0x18")) Then
                             $namedsd[$prop-1]=$databuild
                             if $stop then ExitLoop
@@ -235,10 +247,11 @@ func catch_packets($already=False)
                 $add = false
                 if $prop==0 Then
                     $des[$prop] =  $building
+					$stk=0
                 Else
                     $des[$prop] =  StringMid($building,28)
                 EndIf
-
+				;ConsoleWrite($building & @CRLF)
                 $prop+=1
                 $building = ""
                 $matching = 0
@@ -246,10 +259,12 @@ func catch_packets($already=False)
                 $match_str = "DataItemPropertyType:"
                 $match_len = StringLen($match_str)
                 $end = Binary("0x10")
+
             EndIf
             if($add) Then
                 $building&=BinaryToString($b)
             EndIf
+
         EndIf
 
     Next
@@ -260,36 +275,45 @@ func catch_packets($already=False)
 
     $namedsd[0]=StringMid($des[0],9)
     $des[0] = "Item name"
-
-    $rarity = StringRight($namedsd[0],4)
-    $namedsd[0] = StringLeft($namedsd[0],StringLen($namedsd[0])-5)
-    $rarity = StringLeft($rarity,1)
-    $this_item_rarity=Int($rarity)-1
-    Switch $rarity
-        Case "1"
-            $rarity = "Gray"
-        Case "2"
-            $rarity = "White"
-        Case "3"
-            $rarity = "Green"
-        Case "4"
-            $rarity = "Blue"
-        Case "5"
-            $rarity = "Purple"
-        Case "6"
-            $rarity = "Legi"
-        Case "7"
-            $rarity = "Unique"
-		Case "8"
-            $rarity = "Artifact"
-    EndSwitch
-    $to_data = $des[0] & ": " & $rarity & " " & $namedsd[0] & @CRLF
+	;ConsoleWrite($namedsd[0] & @CRLF)
+	$rarity = ""
+	if StringMid($namedsd[0],StringLen($namedsd[0])-4,1) == "_" Then
+		$rarity = StringRight($namedsd[0],4)
+		$namedsd[0] = StringLeft($namedsd[0],StringLen($namedsd[0])-5)
+		$rarity = StringLeft($rarity,1)
+		$this_item_rarity=Int($rarity)-1
+		Switch $rarity
+			Case "1"
+				$rarity = "Gray"
+			Case "2"
+				$rarity = "White"
+			Case "3"
+				$rarity = "Green"
+			Case "4"
+				$rarity = "Blue"
+			Case "5"
+				$rarity = "Purple"
+			Case "6"
+				$rarity = "Legi"
+			Case "7"
+				$rarity = "Unique"
+			Case "8"
+				$rarity = "Artifact"
+		EndSwitch
+	EndIf
+	$to_data = $des[0] & ": " & $stk & " " & $rarity & " " & $namedsd[0] & @CRLF
     For $e=1 to $prop-1
-        $to_data &= $des[$e] & ": " & Int(StringMid($namedsd[$e],8,4)) & @CRLF
+		$value = SInt(StringMid($namedsd[$e],8,4))
+        $to_data &= $des[$e] & ": " & $value & @CRLF
     Next
-    $to_data &= $des[$prop] & ": " & $namedsd[$prop] & @CRLF
+	$price_line = $des[$prop] & ": " & $namedsd[$prop]
+	if $stk <> 1 then
+		$price_line &= "  (" & int($namedsd[$prop])/$stk  & "* " & $stk & ")"
+	EndIf
+    $to_data &=  $price_line & @CRLF
+	$cost_of_top=1230391
     if $namedsd[$prop] <> "" Then
-        $cost_of_top=Int($namedsd[$prop])
+        $cost_of_top=Int($namedsd[$prop]/$stk)
     EndIf
     GUICtrlSetData($all_data,$to_data)
     ;ConsoleWrite(@CRLF & "Item name: " & $item_name)
@@ -297,6 +321,10 @@ func catch_packets($already=False)
 	FileClose($packets)
 EndFunc
 
+
+Func SInt($iValue)
+    Return int(BitAND($iValue, 0x80) ? BitNOT(BitAND(BitNOT($iValue), 0xFF)) : $iValue)
+EndFunc
 
 Func getText($xs,$ys,$xe,$ye,$s)
     $bruh = _ScreenCapture_Capture("", $xs, $ys, $xe, $ye)
