@@ -177,7 +177,7 @@ func catch_packets()
         $b = FileRead($packets,1)
 		if $stk == 0 Then
 			$stk=int($b)
-			ConsoleWrite("stack size : " & $stk & @CRLF)
+			;ConsoleWrite("stack size : " & $stk & @CRLF)
 		EndIf
         ;if $gotname Then
         ;    if $b >= 0x30 And $b < 0x7b then
@@ -305,7 +305,7 @@ func catch_packets()
 	EndIf
     $to_data &=  $price_line & @CRLF
 	$cost_of_top=1230391
-    if $namedsd[$prop] <> "" Then
+    if $namedsd[$prop] <> "" and $stk <> -1 Then
         $cost_of_top=Int($namedsd[$prop]/$stk)
     EndIf
     GUICtrlSetData($all_data,$to_data)
@@ -471,17 +471,25 @@ EndIf
         if $strat Then
 			optimal_refresh()
             if $cost_of_top < Int(GUICtrlRead($high)) Then
-                buy_cheapest()
-                ConsoleWrite("buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
-                FileWrite($summary,"buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
-                $rarity_buys[$this_item_rarity]+=1
-                $total_spent+=$cost_of_top
+                if buy_cheapest() Then
+					ConsoleWrite("buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
+					FileWrite($summary,"buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
+					$rarity_buys[$this_item_rarity]+=1
+					$total_spent+=$cost_of_top
+
+					;;;;PUT YOUR WEBHOOK HERE, MAYBE PASS IN
+					;;;   GUICtrlRead($all_data)
+					;;; SO IT WILL SAY TELL YOU WHAT YOU BOUGHT
+
+				EndIf
+				sleep(200)
             EndIf
         Else
             $cost = price_check()
             if $cost < Int(GUICtrlRead($high)) Then
                 buy_cheapest()
                 ConsoleWrite("buying item for " & $cost & @CRLF)
+				sleep(200)
             EndIf
             refresh_prices()
         EndIf
@@ -500,27 +508,43 @@ Func refresh_prices($sleep=true)
     EndIf
 EndFunc
 
+
+Func click($x,$y)
+	MouseClick("Primary",$x,$y,1,0)
+EndFunc
+
+func click_buy_on_market_page()
+	click(1794, 360)
+EndFunc
+
+func click_fill_all_items()
+	click(951, 765)
+EndFunc
+
+func click_complete_trade()
+	click(957, 848)
+EndFunc
+
+func click_cancel_trade()
+	click(127, 38)
+EndFunc
+
 Func buy_cheapest()
-    MouseClick("Primary",1794, 360,1,0)
-    Sleep(200)
-    MouseClick("Primary",951, 765,1,0)
-    Sleep(200)
-    MouseClick("Primary",957, 848,1,0)
-    Sleep(800)
-    MouseClick("Primary",959, 621,1,0)
-    sleep(300)
-    ;$basd = PixelGetColor(843, 875)
-    ;if($basd == 0x474330) Then
-    ;    ConsoleWrite("aids" & @CRLF)
-    ;    MouseClick("Primary",107, 38,1,0)
-    ;    sleep(200)
-    ;EndIf
-    Sleep(800)
+    click_buy_on_market_page()
+    Sleep(20)
+    click_fill_all_items()
+    Sleep(20)
+    click_complete_trade()
+	Sleep(200)
+    $pixel = PixelGetColor(341, 320)
+    if($pixel == 0x474039) Then
+        ConsoleWrite("outsniped" & @CRLF)
+		click_cancel_trade()
+		return False
+    EndIf
+    return True
 EndFunc
 
-Func get_price($item_name)
-
-EndFunc
 
 
 Func FilePrepend($szFile,$szText)
