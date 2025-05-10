@@ -2,6 +2,12 @@
 
 Script to automate picking up mislists on the dark and darker market.
 
+!!!! CTRL ALT Q to stop the script at any time !!!!
+
+due to how the network communication works, if you are looking to buy an item with very little data such as gold ingots, you should change the last character of "data/snif.bat" to 1 instead of 2 ie "-w data\packets -c 1".\
+failure to set this correctly will result in less frequent market checks than optimal.
+
+
 comes with two strategies, OCR and Packets.\
 for OCR, you need to have Tesseract-OCR\
 https://github.com/UB-Mannheim/tesseract/wiki
@@ -19,6 +25,6 @@ downsides:
 
 OCR can misread, in fact, it seems to somewhat fequently.  It is especially susceptible to thinking strings of 1's are a letter such as n or m.  This can lead to buying things above your set price.
 
-Packet sniffing relies on their communication protocol being exactly what it is right now.  If they change at all it will need to be reverse engineered again.  In addition to this, sometimes the ip of the market server changes, when this happens one must rediscover it manually using wireshark and write the new ip into "data/snif.bat"
+Packet sniffing relies on their communication protocol being exactly what it is right now.  If they change at all it will need to be reverse engineered again.  In addition to this, sometimes the ip of the market server changes, when this happens one must rediscover it manually using wireshark and write the new ip into "data/snif.bat".
 
-Currently only works on 1920x1080 fullscreen or borderless windowed.  If you want to use it on another resolution please open an issue listing your resolution and I will make a version that works for you. 
+Currently only works on 1920x1080 fullscreen or borderless windowed.  If you want to use it on another resolution please open an issue listing your resolution.
