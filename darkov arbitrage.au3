@@ -121,43 +121,36 @@ EndFunc
 
 Func optimal_refresh()
 	$T = TimerInit()
+	FileDelete("data\packets")
+	;ConsoleWrite(TimerDiff($T) & " time to delete old file" & @CRLF)
+	$T = TimerInit()
 	$PID = Run('data\snif.bat', NULL,NULL,@SW_HIDE)
-	ConsoleWrite(TimerDiff($T) & " time to launch tshark" & @CRLF)
+	;ConsoleWrite(TimerDiff($T) & " time to launch tshark" & @CRLF)
 	$T = TimerInit()
 	refresh_prices(False)
-	ConsoleWrite(TimerDiff($T) & " time to click refresh" & @CRLF)
+	;ConsoleWrite(TimerDiff($T) & " time to click refresh" & @CRLF)
 	$maxwait = 1000
 	$T = TimerInit()
 	While ProcessExists($PID)
 		Sleep(1)
 		if TimerDiff($T) > $maxwait Then
-			ConsoleWrite("must have missed the packets somehow, bailing")
+			;ConsoleWrite("must have missed the packets somehow, bailing" & @CRLF)
 			ProcessClose($PID)
 			ExitLoop
 		EndIf
 	WEnd
-	ConsoleWrite(TimerDiff($T) & " time for those packets to come in" & @CRLF)
-	catch_packets(True)
+	;ConsoleWrite(TimerDiff($T) & " time for those packets to come in" & @CRLF)
+	catch_packets()
 EndFunc
 
-func send_sniffer()
-    RunWait('data\snif.bat', NULL,NULL,@SW_HIDE)
-    ;Sleep(200)
-EndFunc
 
-func send_sniffer_async()
-    Run('data\snif.bat', NULL,NULL,@SW_HIDE)
-    Sleep(800)
-EndFunc
-
-func catch_packets($already=False)
+func catch_packets()
     $cost_of_top=100000
-    ;ConsoleWrite("e" & @CRLF)
-    If not $already Then
-		send_sniffer()
-	EndIf
     ;RunWait('\"Program Files\Wireshark\tshark.exe"', '-i ethernet -f \"src host 35.71.175.214\" -w packets -c 200', NULL,NULL)
     $packets = fileopen("data\packets", $FO_BINARY)
+	if $packets == -1 Then
+		Return
+	EndIf
     Local $b
     $already_matched = false
     $matching = 0
