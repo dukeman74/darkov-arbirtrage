@@ -124,7 +124,11 @@ Func optimal_refresh()
 	FileDelete("data\packets")
 	;ConsoleWrite(TimerDiff($T) & " time to delete old file" & @CRLF)
 	$T = TimerInit()
-	$PID = Run('data\snif.bat', NULL,NULL,@SW_HIDE)
+	;$PID = Run('data\snif.bat', NULL,NULL,@SW_HIDE)
+	$PID = ShellExecute('C:\Program Files\Wireshark\tshark.exe', '-i ethernet -f "(src host 52.223.44.23 or src host 35.71.175.214) and greater 80" -w data\packets -c 1',"","",@SW_HIDE)
+	;ConsoleWrite(ProcessExists($PID))
+	;ConsoleWrite(@error)
+	;sleep(1000)
 	;ConsoleWrite(TimerDiff($T) & " time to launch tshark" & @CRLF)
 	$T = TimerInit()
 	refresh_prices(False)
@@ -134,14 +138,65 @@ Func optimal_refresh()
 	While ProcessExists($PID)
 		Sleep(1)
 		if TimerDiff($T) > $maxwait Then
-			;ConsoleWrite("must have missed the packets somehow, bailing" & @CRLF)
+			ConsoleWrite("must have missed the packet somehow, bailing" & @CRLF)
 			ProcessClose($PID)
-			ExitLoop
+			$cost_of_top = 1823914
+			Return
 		EndIf
 	WEnd
+	;RunWait(@ComSpec & ' /c "C:\Program Files\Wireshark\tshark.exe" -r data/packets -o tcp.reassemble_out_of_order:TRUE -z follow,tcp,raw,0 > data/ordered')
+	;ShellExecuteWait('C:\Program Files\Wireshark\tshark.exe', '-r data/packets -o tcp.reassemble_out_of_order:TRUE -z follow,tcp,raw,0 > data/ordered')
+	;sleep(1000)
+	;convert_text_to_bin("data/ordered","data/market_query_data")
+	;sleep(1000)
 	;ConsoleWrite(TimerDiff($T) & " time for those packets to come in" & @CRLF)
 	catch_packets()
 EndFunc
+
+
+Func convert_text_to_bin($inputFile,$outputFile)
+	Local $in = FileOpen($inputFile, 0)
+    If $in = -1 Then
+        MsgBox(0, "Error", "Unable to open input file: " & $inputFile)
+        Return
+    EndIf
+
+    Local $out = FileOpen($outputFile, 18) ; Binary mode + overwrite
+    If $out = -1 Then
+        MsgBox(0, "Error", "Unable to open output file: " & $outputFile)
+        FileClose($in)
+        Return
+    EndIf
+
+    Local $foundEmpty = False
+	Local $line
+	While True
+		$line = FileReadLine($in)
+		if $line == "" Then
+			ExitLoop
+		EndIf
+	WEnd
+	$i=0
+	While $i<5 ;number of useless lines in the tshark output
+		$line = FileReadLine($in)
+		$i+=1
+	WEnd
+	$line = FileReadLine($in)
+    While 1
+        $next = FileReadLine($in)
+        If @error Then ExitLoop
+
+        For $i = 1 To StringLen($line) Step 2
+            Local $byte = StringMid($line, $i, 2)
+            FileWrite($out, Binary("0x" & $byte))
+        Next
+		$line=$next
+    WEnd
+
+    FileClose($in)
+    FileClose($out)
+EndFunc
+
 
 
 func catch_packets()
@@ -194,6 +249,8 @@ func catch_packets()
                 $costbytes[$juststop]=$b
                 $juststop+=1
                 If ($juststop==2) Then
+					;ConsoleWrite($costbytes[0] & @CRLF)
+					;ConsoleWrite($costbytes[1] & @CRLF)
                     if int($costbytes[1]) == 0x20 Then
                         $namedsd[$prop] = int($costbytes[0])
                     Else
@@ -535,7 +592,7 @@ Func buy_cheapest()
     click_fill_all_items()
     Sleep(20)
     click_complete_trade()
-	Sleep(200)
+	Sleep(1000)
     $pixel = PixelGetColor(341, 320)
     if($pixel == 0x474039) Then
         ConsoleWrite("outsniped" & @CRLF)
