@@ -120,6 +120,11 @@ Func get_cleaned_pic($hbitmap)
 EndFunc
 
 Func optimal_refresh()
+
+
+	;catch_packets()
+	;return
+
 	$T = TimerInit()
 	FileDelete("data\packets")
 	;ConsoleWrite(TimerDiff($T) & " time to delete old file" & @CRLF)
@@ -128,9 +133,13 @@ Func optimal_refresh()
 	$PID = ShellExecute('C:\Program Files\Wireshark\tshark.exe', '-i ethernet -f "(src host 52.223.44.23 or src host 35.71.175.214) and greater 80" -w data\packets -c 1',"","",@SW_HIDE)
 	;ConsoleWrite(ProcessExists($PID))
 	;ConsoleWrite(@error)
-	;sleep(1000)
+	sleep(1)
 	;ConsoleWrite(TimerDiff($T) & " time to launch tshark" & @CRLF)
 	$T = TimerInit()
+
+
+	;return
+
 	refresh_prices(False)
 	;ConsoleWrite(TimerDiff($T) & " time to click refresh" & @CRLF)
 	$maxwait = 1000
@@ -232,6 +241,12 @@ func catch_packets()
         $b = FileRead($packets,1)
 		if $stk == 0 Then
 			$stk=int($b)
+			$b = FileRead($packets,1)
+			$b = FileRead($packets,1) ;skip random extra stuff they added that can have an 0x18 in it
+			$b = FileRead($packets,1)
+			$b = FileRead($packets,1)
+			$b = FileRead($packets,1)
+			$b = FileRead($packets,1)
 			;ConsoleWrite("stack size : " & $stk & @CRLF)
 		EndIf
         ;if $gotname Then
@@ -297,6 +312,11 @@ func catch_packets()
                 $add = false
                 if $prop==0 Then
                     $des[$prop] =  $building
+					;ConsoleWrite( "got name" & $building & @crlf)
+					if StringRight($building, 1) <> "1" Then
+						ConsoleWrite("must have been thinking a socketed gem was a real item" & @crlf)
+						Return
+					EndIf
 					$stk=0
                 Else
                     $des[$prop] =  StringMid($building,28)
@@ -533,7 +553,9 @@ EndIf
 					FileWrite($summary,"buying: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
 					$rarity_buys[$this_item_rarity]+=1
 					$total_spent+=$cost_of_top
-
+					if $cost_of_top == 1 Then
+						FileCopy("data\packets","data\onecostpacket")
+					EndIf
 					;;;;PUT YOUR WEBHOOK HERE, MAYBE PASS IN
 					;;;   GUICtrlRead($all_data)
 					;;; SO IT WILL SAY TELL YOU WHAT YOU BOUGHT
@@ -592,10 +614,11 @@ Func buy_cheapest()
     click_fill_all_items()
     Sleep(20)
     click_complete_trade()
-	Sleep(1000)
+	Sleep(2000)
     $pixel = PixelGetColor(341, 320)
     if($pixel == 0x474039) Then
         ConsoleWrite("outsniped" & @CRLF)
+		ConsoleWrite("failed to buy: " & @CRLF & GUICtrlRead($all_data) & @CRLF)
 		click_cancel_trade()
 		return False
     EndIf
